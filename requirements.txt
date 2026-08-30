@@ -1,0 +1,4 @@
+pandas
+sqlalchemy
+pytest
+python-dotenv
