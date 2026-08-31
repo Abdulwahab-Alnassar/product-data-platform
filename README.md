@@ -31,7 +31,7 @@ Additional technologies will be introduced gradually as the project develops.
 ## Current Progress
 
 - [x] Project structure initialized
-- [ ] Dataset exploration
+- [x] Dataset exploration
 - [ ] Data cleaning pipeline
 - [ ] Database integration
 - [ ] SQL analysis
