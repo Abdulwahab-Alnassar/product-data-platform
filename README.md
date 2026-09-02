@@ -35,7 +35,22 @@ Additional technologies will be introduced gradually as the project develops.
 - [x] Data cleaning pipeline
 - [x] Database integration
 - [x] SQL analysis
-- [ ] Automated testing
+- [x] Automated testing
+
+## Running Tests
+
+Install the project dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the automated test suite:
+
+```bash
+python -m pytest -v
+```
+
 
 ## Dataset
 
