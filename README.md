@@ -32,7 +32,7 @@ Additional technologies will be introduced gradually as the project develops.
 
 - [x] Project structure initialized
 - [x] Dataset exploration
-- [ ] Data cleaning pipeline
+- [x] Data cleaning pipeline
 - [ ] Database integration
 - [ ] SQL analysis
 - [ ] Automated testing
