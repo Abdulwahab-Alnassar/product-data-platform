@@ -1,6 +1,8 @@
 import sqlite3
+import logging
+from contextlib import closing
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -22,6 +24,8 @@ DATABASE_PATH = (
 )
 
 SCHEMA_PATH = PROJECT_ROOT / "sql" / "schema.sql"
+VIEWS_PATH = PROJECT_ROOT / "sql" / "views.sql"
+LOGGER = logging.getLogger("product_data_platform")
 
 
 DATABASE_COLUMNS = [
@@ -84,6 +88,7 @@ def prepare_data(data: pd.DataFrame) -> pd.DataFrame:
                 by="rating_count",
                 ascending=False,
                 na_position="last",
+                kind="stable",
             )
             .drop_duplicates(
                 subset=["product_id"],
@@ -93,10 +98,7 @@ def prepare_data(data: pd.DataFrame) -> pd.DataFrame:
 
     prepared_data = prepared_data[DATABASE_COLUMNS]
 
-    print(
-        "Duplicate product IDs removed: "
-        f"{duplicate_products}"
-    )
+    LOGGER.info("Duplicate product IDs removed: %s", duplicate_products)
 
     return prepared_data
 
@@ -129,47 +131,71 @@ def create_records(
 
 def load_database(
     data: pd.DataFrame,
+    database_path: Optional[Path] = None,
 ) -> int:
-    """Create the database and insert product records."""
+    """Upsert a batch atomically; return verified batch rows, not table size.
 
-    DATABASE_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    schema = SCHEMA_PATH.read_text(
-        encoding="utf-8"
-    )
-
-    placeholders = ", ".join(
-        ["?"] * len(DATABASE_COLUMNS)
-    )
-
-    column_names = ", ".join(DATABASE_COLUMNS)
-
-    insert_query = f"""
-        INSERT INTO products ({column_names})
-        VALUES ({placeholders})
+    Incoming values (including NULL) replace existing values for matching
+    IDs. Products absent from this batch remain in the database.
     """
+    validate_columns(data)
+    data = data[DATABASE_COLUMNS].copy()
+    if data.empty:
+        raise ValueError("Cannot load an empty batch.")
+    for name in ("product_id", "product_name"):
+        values = data[name].astype("string").str.strip()
+        if (values.isna() | values.eq("")).any():
+            raise ValueError(f"Missing or blank {name}.")
+        data[name] = values
+    if data["product_id"].duplicated().any():
+        raise ValueError("Duplicate product IDs in prepared batch.")
 
+    target = DATABASE_PATH if database_path is None else Path(database_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    columns = ", ".join(DATABASE_COLUMNS)
+    placeholders = ", ".join("?" for _ in DATABASE_COLUMNS)
+    updates = ", ".join(
+        f"{column} = excluded.{column}"
+        for column in DATABASE_COLUMNS if column != "product_id"
+    )
+    query = (
+        f"INSERT INTO products ({columns}) VALUES ({placeholders}) "
+        f"ON CONFLICT(product_id) DO UPDATE SET {updates}"
+    )
     records = create_records(data)
 
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        connection.executescript(schema)
+    with closing(sqlite3.connect(target)) as connection:
+        connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        connection.executescript(VIEWS_PATH.read_text(encoding="utf-8"))
+        with connection:
+            # A temporary table lets us verify all incoming values in one
+            # query, including NULLs, before committing the batch.
+            connection.execute(
+                f"CREATE TEMP TABLE batch_products AS "
+                f"SELECT {columns} FROM products WHERE 0"
+            )
+            connection.executemany(
+                f"INSERT INTO batch_products ({columns}) VALUES ({placeholders})",
+                records,
+            )
+            connection.executemany(query, records)
+            matches = " AND ".join(
+                f"p.{column} IS b.{column}" for column in DATABASE_COLUMNS
+            )
+            verified_count = connection.execute(
+                "SELECT COUNT(*) FROM batch_products b "
+                "JOIN products p ON p.product_id = b.product_id "
+                f"WHERE {matches}"
+            ).fetchone()[0]
+            if verified_count != len(records):
+                raise ValueError("Stored values do not match the incoming batch.")
+    return verified_count
 
-        # Make the script repeatable without duplicating data.
-        connection.execute("DELETE FROM products")
 
-        connection.executemany(
-            insert_query,
-            records,
-        )
-
-        database_count = connection.execute(
-            "SELECT COUNT(*) FROM products"
-        ).fetchone()[0]
-
-    return database_count
+def get_database_count(database_path: Optional[Path] = None) -> int:
+    target = DATABASE_PATH if database_path is None else Path(database_path)
+    with closing(sqlite3.connect(target.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+        return connection.execute("SELECT COUNT(*) FROM products").fetchone()[0]
 
 
 def main() -> None:
@@ -182,7 +208,8 @@ def main() -> None:
     database_count = load_database(prepared_data)
 
     print(f"CSV rows prepared: {len(prepared_data)}")
-    print(f"Database rows:      {database_count}")
+    print(f"Verified batch rows: {database_count}")
+    print(f"Total database rows: {get_database_count()}")
     print(f"Database saved to:  {DATABASE_PATH}")
 
     if len(prepared_data) != database_count:

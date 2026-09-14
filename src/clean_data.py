@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
@@ -57,10 +58,10 @@ def clean_count(series: pd.Series) -> pd.Series:
         .str.strip()
     )
 
-    return pd.to_numeric(
-        cleaned_series,
-        errors="coerce",
-    ).astype("Int64")
+    numeric = pd.to_numeric(cleaned_series, errors="coerce")
+    # Fractional/infinite counts are invalid, not values to round silently.
+    numeric = numeric.where(numeric.mod(1).eq(0).fillna(False))
+    return numeric.astype("Int64")
 
 
 def clean_data(data: pd.DataFrame) -> pd.DataFrame:
@@ -96,6 +97,9 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
         for column in ["product_id", "product_name"]
         if column in cleaned_data.columns
     ]
+
+    for column in required_columns:
+        cleaned_data[column] = cleaned_data[column].replace("", pd.NA)
 
     cleaned_data = cleaned_data.dropna(
         subset=required_columns
@@ -162,28 +166,18 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     return cleaned_data.reset_index(drop=True)
 
 
-def save_data(data: pd.DataFrame) -> None:
-    """Save the processed dataset and a safe public sample."""
-
-    PROCESSED_DATA_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    SAMPLE_DATA_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    data.to_csv(
-        PROCESSED_DATA_PATH,
-        index=False,
-    )
-
-    data.head(100).to_csv(
-        SAMPLE_DATA_PATH,
-        index=False,
-    )
+def save_data(
+    data: pd.DataFrame,
+    processed_path: Optional[Path] = None,
+    sample_path: Optional[Path] = None,
+) -> None:
+    """Save the cleaned intermediate data and a sample."""
+    processed_path = PROCESSED_DATA_PATH if processed_path is None else processed_path
+    sample_path = SAMPLE_DATA_PATH if sample_path is None else sample_path
+    processed_path.parent.mkdir(parents=True, exist_ok=True)
+    sample_path.parent.mkdir(parents=True, exist_ok=True)
+    data.to_csv(processed_path, index=False)
+    data.head(100).to_csv(sample_path, index=False)
 
 
 def main() -> None:

@@ -28,6 +28,7 @@ def pipeline_paths(
     monkeypatch.setattr(cleaning, "SAMPLE_DATA_PATH", paths["sample"])
     monkeypatch.setattr(database, "DATABASE_PATH", paths["database"])
 
+    monkeypatch.setattr(pipeline, "LOG_PATH", tmp_path / "logs" / "pipeline.log")
     return paths
 
 
@@ -109,6 +110,7 @@ def test_pipeline_end_to_end(
         "cleaned_rows": 3,
         "removed_rows": 1,
         "duplicate_product_ids": 1,
+        "batch_rows": 2,
         "database_rows": 2,
     }
 
@@ -122,7 +124,7 @@ def test_pipeline_end_to_end(
     assert cleaned.loc[0, "discounted_price"] == 1099
 
     # Exercise the command entry point and a second complete run.
-    pipeline.main()
+    pipeline.main([])
     output = capsys.readouterr().out
     assert "Pipeline completed successfully." in output
     assert "Database validation passed." in output
@@ -208,10 +210,10 @@ def test_pipeline_rejects_row_count_mismatch(
     monkeypatch.setattr(
         database,
         "load_database",
-        lambda data: len(data) - 1,
+        lambda data, **kwargs: len(data) - 1,
     )
 
     with pytest.raises(ValueError, match="expected 2, found 1"):
-        pipeline.main()
+        pipeline.main([])
 
     assert "Pipeline completed successfully." not in capsys.readouterr().out

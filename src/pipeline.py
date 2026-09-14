@@ -1,77 +1,98 @@
-"""Run the existing extract, transform, and load stages in one command."""
+"""Extract, transform, validate, and upsert products with one command."""
 
+import argparse
+import logging
 from pathlib import Path
+from time import perf_counter
 from typing import Optional
 
 from src import clean_data as cleaning
 from src import load_to_db as database
+from src.logging_utils import pipeline_logging
+from src.validate_data import build_quality_report, require_quality, save_quality_report
+
+LOGGER = logging.getLogger("product_data_platform")
+LOG_PATH = cleaning.PROJECT_ROOT / "logs" / "pipeline.log"
 
 
 def run_pipeline(
     raw_data_path: Optional[Path] = None,
+    output_dir: Optional[Path] = None,
 ) -> dict[str, int]:
-    """Process a raw CSV and return counts for the completed run."""
+    """Validate before writing data; verify the batch separately from the total."""
+    started = perf_counter()
+    source = cleaning.RAW_DATA_PATH if raw_data_path is None else Path(raw_data_path)
+    output = None if output_dir is None else Path(output_dir)
+    cleaned_path = cleaning.PROCESSED_DATA_PATH if output is None else output / "cleaned_products.csv"
+    sample_path = cleaning.SAMPLE_DATA_PATH if output is None else output / "cleaned_products_sample.csv"
+    db_path = database.DATABASE_PATH if output is None else output / "products.db"
+    report_path = cleaned_path.parent / "quality_report.json"
 
-    source_path = (
-        cleaning.RAW_DATA_PATH
-        if raw_data_path is None
-        else Path(raw_data_path)
-    )
+    try:
+        LOGGER.info("[1/5] Extract: reading %s", source)
+        raw = cleaning.load_data(source)
+        if raw.empty:
+            raise ValueError("The raw dataset contains no rows.")
 
-    print(f"[1/5] Extract: reading {source_path}")
-    raw_data = cleaning.load_data(source_path)
+        LOGGER.info("[2/5] Transform: cleaning %s rows", len(raw))
+        cleaned = cleaning.clean_data(raw)
+        database.validate_columns(cleaned)
+        if cleaned.empty:
+            raise ValueError("No usable products remain after cleaning.")
 
-    if raw_data.empty:
-        raise ValueError("The raw dataset contains no rows.")
+        LOGGER.info("[3/5] Validate: preparing unique products")
+        prepared = database.prepare_data(cleaned)
+        report = build_quality_report(prepared, source_columns=cleaned.columns)
+        save_quality_report(report, report_path)
+        LOGGER.info("Quality report: %s (errors=%s, warnings=%s)",
+                    report_path, report["failed_checks"], report["warning_checks"])
+        if report["warning_checks"]:
+            LOGGER.warning("Missing numeric values: see quality report for counts")
+        require_quality(report)
 
-    print("[2/5] Transform: cleaning product data")
-    cleaned_data = cleaning.clean_data(raw_data)
-
-    print("[3/5] Validate: checking columns and preparing unique products")
-    database.validate_columns(cleaned_data)
-
-    # The current loader replaces the table contents. Do not clear an
-    # existing database when there are no usable input rows.
-    if cleaned_data.empty:
-        raise ValueError("No usable products remain after cleaning.")
-
-    prepared_data = database.prepare_data(cleaned_data)
-
-    print("[4/5] Save: writing the cleaned CSV and public sample")
-    cleaning.save_data(cleaned_data)
-
-    print("[5/5] Load: writing products to SQLite")
-    database_count = database.load_database(prepared_data)
-    expected_count = len(prepared_data)
-
-    if database_count != expected_count:
-        raise ValueError(
-            "Database row count mismatch: "
-            f"expected {expected_count}, found {database_count}."
+        LOGGER.info("[4/5] Save: writing cleaned CSV and sample")
+        cleaning.save_data(
+            cleaned, processed_path=cleaned_path, sample_path=sample_path
         )
+        LOGGER.info("[5/5] Load: upserting %s products", len(prepared))
+        verified = database.load_database(prepared, database_path=db_path)
+        if verified != len(prepared):
+            raise ValueError(
+                f"Database row count mismatch: expected {len(prepared)}, found {verified}."
+            )
 
-    return {
-        "raw_rows": len(raw_data),
-        "cleaned_rows": len(cleaned_data),
-        "removed_rows": len(raw_data) - len(cleaned_data),
-        "duplicate_product_ids": len(cleaned_data) - expected_count,
-        "database_rows": database_count,
-    }
+        total = database.get_database_count(db_path)
+        summary = {
+            "raw_rows": len(raw),
+            "cleaned_rows": len(cleaned),
+            "removed_rows": len(raw) - len(cleaned),
+            "duplicate_product_ids": len(cleaned) - len(prepared),
+            "batch_rows": verified,
+            "database_rows": total,
+        }
+        LOGGER.info("Completed in %.3f seconds: %s", perf_counter() - started, summary)
+        return summary
+    except Exception:
+        LOGGER.exception("Pipeline failed after %.3f seconds", perf_counter() - started)
+        raise
 
 
-def main() -> None:
-    summary = run_pipeline()
-
-    print("\nPipeline completed successfully.")
-    print(f"Rows read:                    {summary['raw_rows']}")
-    print(f"Rows after cleaning:          {summary['cleaned_rows']}")
-    print(f"Rows removed during cleaning: {summary['removed_rows']}")
-    print(f"Duplicate product IDs:        {summary['duplicate_product_ids']}")
-    print(f"Products in database:         {summary['database_rows']}")
-    print("Database validation passed.")
-    print(f"Cleaned CSV: {cleaning.PROCESSED_DATA_PATH}")
-    print(f"Public sample: {cleaning.SAMPLE_DATA_PATH}")
-    print(f"Database: {database.DATABASE_PATH}")
+def main(argv=None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, help="Raw CSV (default: data/raw/amazon.csv)")
+    parser.add_argument("--output-dir", type=Path, help="Isolated output directory for demos")
+    args = parser.parse_args(argv)
+    log_path = LOG_PATH if args.output_dir is None else args.output_dir / "pipeline.log"
+    with pipeline_logging(log_path) as logger:
+        summary = run_pipeline(args.input, args.output_dir)
+        logger.info("Pipeline completed successfully.")
+        logger.info("Database validation passed.")
+        logger.info("Rows read: %s", summary["raw_rows"])
+        logger.info("Rows after cleaning: %s", summary["cleaned_rows"])
+        logger.info("Rows removed during cleaning: %s", summary["removed_rows"])
+        logger.info("Duplicate product IDs: %s", summary["duplicate_product_ids"])
+        logger.info("Verified batch products: %s", summary["batch_rows"])
+        logger.info("Total products in database: %s", summary["database_rows"])
 
 
 if __name__ == "__main__":
