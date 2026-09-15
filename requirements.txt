@@ -2,3 +2,5 @@ pandas
 sqlalchemy
 pytest
 python-dotenv
+psycopg[binary]>=3.2,<4
+streamlit>=1.40,<2

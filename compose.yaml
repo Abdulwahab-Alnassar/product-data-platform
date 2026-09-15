@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-products_app}
+      POSTGRES_DB: ${POSTGRES_DB:-products}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  pipeline:
+    build: .
+    environment: &app-env
+      PGHOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-products_app}
+      POSTGRES_DB: ${POSTGRES_DB:-products}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DASHBOARD_BACKEND: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    command: [python, -m, src.pipeline, --backend, postgres, --input, data/sample/amazon_sample.csv, --output-dir, data/processed]
+    volumes:
+      - outputs:/app/data/processed
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  dashboard:
+    build: .
+    environment: *app-env
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    ports: ['127.0.0.1:8501:8501']
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+volumes:
+  pgdata:
+  outputs:

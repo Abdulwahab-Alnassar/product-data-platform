@@ -18,9 +18,12 @@ LOG_PATH = cleaning.PROJECT_ROOT / "logs" / "pipeline.log"
 def run_pipeline(
     raw_data_path: Optional[Path] = None,
     output_dir: Optional[Path] = None,
+    backend: str = 'sqlite',
 ) -> dict[str, int]:
     """Validate before writing data; verify the batch separately from the total."""
     started = perf_counter()
+    if backend not in ('sqlite', 'postgres'):
+        raise ValueError('Unknown backend.')
     source = cleaning.RAW_DATA_PATH if raw_data_path is None else Path(raw_data_path)
     output = None if output_dir is None else Path(output_dir)
     cleaned_path = cleaning.PROCESSED_DATA_PATH if output is None else output / "cleaned_products.csv"
@@ -55,13 +58,17 @@ def run_pipeline(
             cleaned, processed_path=cleaned_path, sample_path=sample_path
         )
         LOGGER.info("[5/5] Load: upserting %s products", len(prepared))
-        verified = database.load_database(prepared, database_path=db_path)
+        if backend == 'postgres':
+            from src import postgres_storage
+            verified = postgres_storage.load_database(prepared)
+        else:
+            verified = database.load_database(prepared, database_path=db_path)
         if verified != len(prepared):
             raise ValueError(
                 f"Database row count mismatch: expected {len(prepared)}, found {verified}."
             )
 
-        total = database.get_database_count(db_path)
+        total = postgres_storage.get_database_count() if backend == 'postgres' else database.get_database_count(db_path)
         summary = {
             "raw_rows": len(raw),
             "cleaned_rows": len(cleaned),
@@ -81,10 +88,11 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, help="Raw CSV (default: data/raw/amazon.csv)")
     parser.add_argument("--output-dir", type=Path, help="Isolated output directory for demos")
+    parser.add_argument('--backend', choices=['sqlite', 'postgres'], default='sqlite')
     args = parser.parse_args(argv)
     log_path = LOG_PATH if args.output_dir is None else args.output_dir / "pipeline.log"
     with pipeline_logging(log_path) as logger:
-        summary = run_pipeline(args.input, args.output_dir)
+        summary = run_pipeline(args.input, args.output_dir, backend=args.backend)
         logger.info("Pipeline completed successfully.")
         logger.info("Database validation passed.")
         logger.info("Rows read: %s", summary["raw_rows"])

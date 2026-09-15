@@ -9,9 +9,18 @@ validates quality, upserts products into SQLite, and runs SQL analytics.
 
 Build an end-to-end product data platform, starting with batch processing
 and gradually extending to real-time pipelines and AI-powered product Q&A.
-PostgreSQL, Docker, hybrid search, and RAG are future milestones.
+The month-one core includes PostgreSQL, Docker, and a local Streamlit dashboard.
+Hybrid search, real-time ingestion, and RAG remain future milestones.
 
 ## Current Progress
+
+- [x] PostgreSQL transactional storage and integration tests (week 3)
+- [x] Docker Compose: database, sample pipeline, local dashboard (week 3)
+- [x] Read-only Streamlit dashboard, filters, safe CSV export (week 4)
+- [x] Dashboard tests, container smoke checks, operational guide (week 4)
+
+Start with the [Arabic weeks 3–4 guide](docs/week3-4-guide-ar.md) for commands,
+file-by-file explanations, backup instructions, and known limitations.
 
 - [x] Project structure and dataset exploration
 - [x] Data cleaning and relational storage
@@ -30,7 +39,39 @@ explanation and the recommended order for reading the code.
 ## Technology Stack
 
 Python 3.12, Pandas, SQLite, SQL, Pytest, Git, and GitHub Actions.
-PostgreSQL is planned for the next stage.
+PostgreSQL 17, Psycopg 3, Docker Compose, and Streamlit complete the core demo.
+
+## Dashboard quick start
+
+After installing dependencies and running the default SQLite pipeline:
+
+```bash
+python -m streamlit run dashboard.py
+```
+
+Open http://localhost:8501. For a different SQLite output, set `SQLITE_PATH`
+to its `products.db`. The dashboard reads stored products, not the latest
+incoming batch only. Search is literal and CSV downloads escape formula-like
+text. This is a local educational demo without authentication.
+
+For PostgreSQL and Docker, copy `.env.example` to `.env` if it does not already
+exist, set a strong `POSTGRES_PASSWORD`, and run:
+
+```bash
+docker compose up --build -d --wait dashboard
+```
+
+This explicitly loads the included sample. PostgreSQL data persists in a
+named volume; `docker compose down` stops services without deleting it.
+The dashboard is bound to loopback only. Never commit `.env` or backups.
+See the Arabic guide for full local input, troubleshooting, and backups.
+The standalone pipeline selects PostgreSQL with `--backend postgres`;
+connection configuration is `DATABASE_URL` or `PGHOST`, `PGPORT`,
+`POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD` (environment wins over `.env`).
+SQLite remains the default. Both stores use the same incoming-batch quality gate.
+PostgreSQL schema and view SQL live in `sql/postgres/`; existing SQLite files
+are not automatically migrated. Saved CLI SQL analysis currently targets SQLite;
+the dashboard supports both databases.
 
 ## Setup and Run
 
@@ -155,11 +196,17 @@ python -m pytest -v
 ```
 
 Tests use synthetic data and temporary databases. They cover cleaning,
+dashboard interactions, read-only access, PostgreSQL rollback and upserts,
 quality failures, pipeline orchestration, partial upserts, rollback,
 SQL rankings, and logging. GitHub Actions runs on pushes and pull requests
 on both Ubuntu and Windows using Python 3.12, then runs the public sample
 through the pipeline and saved SQL analysis. It does not use your full
 local dataset or upload raw data or generated databases.
+
+PostgreSQL tests opt in with `TEST_DATABASE_URL` and isolate each test in a
+temporary schema. Use a disposable test database only. Separate CI jobs run
+these tests on PostgreSQL 17 and build/start the full Compose stack with a
+dashboard health check and a real analytics query.
 
 ## Dataset and Data Handling
 
