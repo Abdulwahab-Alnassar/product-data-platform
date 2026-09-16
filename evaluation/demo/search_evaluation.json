@@ -1,0 +1,58 @@
+{
+  "queries": 5,
+  "k": 5,
+  "hit_rate_at_k": 1.0,
+  "mrr_at_k": 0.9,
+  "cases": [
+    {
+      "query": "B07JW9H4J1",
+      "rank": 1,
+      "returned_ids": [
+        "B07JW9H4J1"
+      ]
+    },
+    {
+      "query": "Airtel DigitalTV DTH remote",
+      "rank": 1,
+      "returned_ids": [
+        "B07B275VN9",
+        "B09L8DSSFH",
+        "B01N90RZ4M",
+        "B093ZNQZ2Y"
+      ]
+    },
+    {
+      "query": "ZEBRONICS ZEB-USB150WF1 wifi adapter",
+      "rank": 1,
+      "returned_ids": [
+        "B093QCY6YJ",
+        "B0141EZMAI",
+        "B008IFXQFU",
+        "B07KRCW6LZ"
+      ]
+    },
+    {
+      "query": "AmazonBasics A-Male B-Male printer cable",
+      "rank": 1,
+      "returned_ids": [
+        "B00NH11KIK",
+        "B00NH11PEY",
+        "B0994GFWBH",
+        "B014I8SSD0",
+        "B014I8SX4Y"
+      ]
+    },
+    {
+      "query": "Duracell Mfi Lightning cable",
+      "rank": 2,
+      "returned_ids": [
+        "B09W5XR9RT",
+        "B09C6HXFC1",
+        "B082T6V3DT",
+        "B09C6HWG18",
+        "B07XLCFSSN"
+      ]
+    }
+  ],
+  "limitation": "Small manually selected smoke fixture, not independent relevance evaluation."
+}

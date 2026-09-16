@@ -16,12 +16,18 @@ from src.validate_data import build_quality_report, require_quality, save_qualit
 @pytest.fixture
 def product():
     return {
-        "product_id": "P1", "product_name": "Keyboard",
+        "product_id": "P1",
+        "product_name": "Keyboard",
         "category": "Electronics|Accessories",
-        "discounted_price": 100.0, "actual_price": 150.0,
-        "discount_percentage": 33.0, "rating": 4.5, "rating_count": 200,
-        "about_product": "Synthetic product", "review_id": "R1",
-        "review_title": "Review", "review_content": "Synthetic review",
+        "discounted_price": 100.0,
+        "actual_price": 150.0,
+        "discount_percentage": 33.0,
+        "rating": 4.5,
+        "rating_count": 200,
+        "about_product": "Synthetic product",
+        "review_id": "R1",
+        "review_title": "Review",
+        "review_content": "Synthetic review",
         "img_link": "https://example.com/image",
         "product_link": "https://example.com/product",
     }
@@ -34,17 +40,20 @@ def test_quality_accepts_valid_data(product):
     assert report["warning_checks"] == 0
 
 
-@pytest.mark.parametrize("column,value", [
-    ("product_id", " "),
-    ("product_name", None),
-    ("discounted_price", -1),
-    ("actual_price", float("inf")),
-    ("rating", 6),
-    ("rating", "invalid"),
-    ("discount_percentage", 101),
-    ("rating_count", 1.5),
-    ("rating_count", -1),
-])
+@pytest.mark.parametrize(
+    "column,value",
+    [
+        ("product_id", " "),
+        ("product_name", None),
+        ("discounted_price", -1),
+        ("actual_price", float("inf")),
+        ("rating", 6),
+        ("rating", "invalid"),
+        ("discount_percentage", 101),
+        ("rating_count", 1.5),
+        ("rating_count", -1),
+    ],
+)
 def test_quality_rejects_invalid_values(product, column, value):
     report = build_quality_report(pd.DataFrame([{**product, column: value}]))
     with pytest.raises(ValueError, match="Data quality failed"):
@@ -129,10 +138,12 @@ def test_upsert_updates_and_preserves_absent_products(product, tmp_path):
 def test_failed_batch_rolls_back_prior_updates(product, tmp_path):
     path = tmp_path / "products.db"
     load_to_db.load_database(pd.DataFrame([product]), path)
-    batch = pd.DataFrame([
-        {**product, "product_name": "Changed"},
-        {**product, "product_id": "P2", "rating": 6},
-    ])
+    batch = pd.DataFrame(
+        [
+            {**product, "product_name": "Changed"},
+            {**product, "product_id": "P2", "rating": 6},
+        ]
+    )
     with pytest.raises(sqlite3.IntegrityError):
         load_to_db.load_database(batch, path)
     with closing(sqlite3.connect(path)) as con:
@@ -158,13 +169,18 @@ def test_loader_rejects_bad_batches_before_writing(product, tmp_path, kind):
 
 def test_views_rank_ties_and_calculate_inr_savings(product, tmp_path):
     path = tmp_path / "products.db"
-    load_to_db.load_database(pd.DataFrame([
-        product,
-        {**product, "product_id": "P2"},
-        {**product, "product_id": "P3", "rating": 3.5},
-        {**product, "product_id": "P4", "rating": None},
-        {**product, "product_id": "P5", "category": "Home", "rating": 5},
-    ]), path)
+    load_to_db.load_database(
+        pd.DataFrame(
+            [
+                product,
+                {**product, "product_id": "P2"},
+                {**product, "product_id": "P3", "rating": 3.5},
+                {**product, "product_id": "P4", "rating": None},
+                {**product, "product_id": "P5", "category": "Home", "rating": 5},
+            ]
+        ),
+        path,
+    )
     with closing(sqlite3.connect(path)) as con:
         assert con.execute(
             "SELECT product_id, rating_rank FROM category_product_rankings ORDER BY product_id"
@@ -197,15 +213,22 @@ def test_pipeline_quality_failure_preserves_data_outputs(product, tmp_path):
     output = tmp_path / "output"
     pd.DataFrame([product]).to_csv(raw, index=False)
     pipeline.run_pipeline(raw, output)
-    files = [output / name for name in (
-        "products.db", "cleaned_products.csv", "cleaned_products_sample.csv"
-    )]
+    files = [
+        output / name
+        for name in (
+            "products.db",
+            "cleaned_products.csv",
+            "cleaned_products_sample.csv",
+        )
+    ]
     before = [path.read_bytes() for path in files]
     pd.DataFrame([{**product, "discounted_price": 200}]).to_csv(raw, index=False)
     with pytest.raises(ValueError, match="Data quality failed"):
         pipeline.run_pipeline(raw, output)
     assert [path.read_bytes() for path in files] == before
-    assert json.loads((output / "quality_report.json").read_text())["status"] == "failed"
+    assert (
+        json.loads((output / "quality_report.json").read_text())["status"] == "failed"
+    )
 
 
 def test_logging_does_not_duplicate_handlers(tmp_path, capsys):
@@ -222,11 +245,20 @@ def test_logging_does_not_duplicate_handlers(tmp_path, capsys):
 
 def test_cli_failure_is_logged_and_returns_nonzero(tmp_path):
     output = tmp_path / "output"
-    result = subprocess.run([
-        sys.executable, "-m", "src.pipeline",
-        "--input", str(tmp_path / "missing.csv"),
-        "--output-dir", str(output),
-    ], cwd=load_to_db.PROJECT_ROOT, capture_output=True, text=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.pipeline",
+            "--input",
+            str(tmp_path / "missing.csv"),
+            "--output-dir",
+            str(output),
+        ],
+        cwd=load_to_db.PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode != 0
     assert "Pipeline failed" in (output / "pipeline.log").read_text()
     assert not (output / "products.db").exists()

@@ -9,19 +9,9 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-CLEANED_DATA_PATH = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "cleaned_products.csv"
-)
+CLEANED_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "cleaned_products.csv"
 
-DATABASE_PATH = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "products.db"
-)
+DATABASE_PATH = PROJECT_ROOT / "data" / "processed" / "products.db"
 
 SCHEMA_PATH = PROJECT_ROOT / "sql" / "schema.sql"
 VIEWS_PATH = PROJECT_ROOT / "sql" / "views.sql"
@@ -50,9 +40,7 @@ def load_cleaned_data(file_path: Path) -> pd.DataFrame:
     """Load the cleaned product data."""
 
     if not file_path.exists():
-        raise FileNotFoundError(
-            f"Cleaned dataset not found: {file_path}"
-        )
+        raise FileNotFoundError(f"Cleaned dataset not found: {file_path}")
 
     return pd.read_csv(file_path)
 
@@ -61,15 +49,11 @@ def validate_columns(data: pd.DataFrame) -> None:
     """Ensure that all required database columns exist."""
 
     missing_columns = [
-        column
-        for column in DATABASE_COLUMNS
-        if column not in data.columns
+        column for column in DATABASE_COLUMNS if column not in data.columns
     ]
 
     if missing_columns:
-        raise ValueError(
-            f"Missing columns: {missing_columns}"
-        )
+        raise ValueError(f"Missing columns: {missing_columns}")
 
 
 def prepare_data(data: pd.DataFrame) -> pd.DataFrame:
@@ -77,23 +61,17 @@ def prepare_data(data: pd.DataFrame) -> pd.DataFrame:
 
     prepared_data = data.copy()
 
-    duplicate_products = prepared_data[
-        "product_id"
-    ].duplicated().sum()
+    duplicate_products = prepared_data["product_id"].duplicated().sum()
 
     if duplicate_products:
-        prepared_data = (
-            prepared_data
-            .sort_values(
-                by="rating_count",
-                ascending=False,
-                na_position="last",
-                kind="stable",
-            )
-            .drop_duplicates(
-                subset=["product_id"],
-                keep="first",
-            )
+        prepared_data = prepared_data.sort_values(
+            by="rating_count",
+            ascending=False,
+            na_position="last",
+            kind="stable",
+        ).drop_duplicates(
+            subset=["product_id"],
+            keep="first",
         )
 
     prepared_data = prepared_data[DATABASE_COLUMNS]
@@ -156,7 +134,8 @@ def load_database(
     placeholders = ", ".join("?" for _ in DATABASE_COLUMNS)
     updates = ", ".join(
         f"{column} = excluded.{column}"
-        for column in DATABASE_COLUMNS if column != "product_id"
+        for column in DATABASE_COLUMNS
+        if column != "product_id"
     )
     query = (
         f"INSERT INTO products ({columns}) VALUES ({placeholders}) "
@@ -167,6 +146,10 @@ def load_database(
     with closing(sqlite3.connect(target)) as connection:
         connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
         connection.executescript(VIEWS_PATH.read_text(encoding="utf-8"))
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.executescript(
+            (PROJECT_ROOT / "sql/changes.sql").read_text(encoding="utf-8")
+        )
         with connection:
             # A temporary table lets us verify all incoming values in one
             # query, including NULLs, before committing the batch.
@@ -194,7 +177,9 @@ def load_database(
 
 def get_database_count(database_path: Optional[Path] = None) -> int:
     target = DATABASE_PATH if database_path is None else Path(database_path)
-    with closing(sqlite3.connect(target.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+    with closing(
+        sqlite3.connect(target.resolve().as_uri() + "?mode=ro", uri=True)
+    ) as connection:
         return connection.execute("SELECT COUNT(*) FROM products").fetchone()[0]
 
 
@@ -213,9 +198,7 @@ def main() -> None:
     print(f"Database saved to:  {DATABASE_PATH}")
 
     if len(prepared_data) != database_count:
-        raise ValueError(
-            "CSV and database row counts do not match."
-        )
+        raise ValueError("CSV and database row counts do not match.")
 
     print("Database validation passed.")
 

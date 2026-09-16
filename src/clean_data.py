@@ -7,12 +7,8 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw" / "amazon.csv"
-PROCESSED_DATA_PATH = (
-    PROJECT_ROOT / "data" / "processed" / "cleaned_products.csv"
-)
-SAMPLE_DATA_PATH = (
-    PROJECT_ROOT / "data" / "sample" / "cleaned_products_sample.csv"
-)
+PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "cleaned_products.csv"
+SAMPLE_DATA_PATH = PROJECT_ROOT / "data" / "sample" / "cleaned_products_sample.csv"
 
 
 def load_data(file_path: Path) -> pd.DataFrame:
@@ -41,9 +37,7 @@ def clean_percentage(series: pd.Series) -> pd.Series:
     """Convert values such as 64% into numeric values."""
 
     cleaned_series = (
-        series.astype("string")
-        .str.replace("%", "", regex=False)
-        .str.strip()
+        series.astype("string").str.replace("%", "", regex=False).str.strip()
     )
 
     return pd.to_numeric(cleaned_series, errors="coerce")
@@ -53,9 +47,7 @@ def clean_count(series: pd.Series) -> pd.Series:
     """Convert values such as 24,269 into integer values."""
 
     cleaned_series = (
-        series.astype("string")
-        .str.replace(",", "", regex=False)
-        .str.strip()
+        series.astype("string").str.replace(",", "", regex=False).str.strip()
     )
 
     numeric = pd.to_numeric(cleaned_series, errors="coerce")
@@ -70,23 +62,13 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     cleaned_data = data.copy()
 
     # Standardize column names.
-    cleaned_data.columns = (
-        cleaned_data.columns
-        .str.strip()
-        .str.lower()
-    )
+    cleaned_data.columns = cleaned_data.columns.str.strip().str.lower()
 
     # Remove extra spaces from text columns.
-    text_columns = cleaned_data.select_dtypes(
-        include=["object", "string"]
-    ).columns
+    text_columns = cleaned_data.select_dtypes(include=["object", "string"]).columns
 
     for column in text_columns:
-        cleaned_data[column] = (
-            cleaned_data[column]
-            .astype("string")
-            .str.strip()
-        )
+        cleaned_data[column] = cleaned_data[column].astype("string").str.strip()
 
     # Remove completely duplicated rows.
     cleaned_data = cleaned_data.drop_duplicates()
@@ -101,16 +83,12 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     for column in required_columns:
         cleaned_data[column] = cleaned_data[column].replace("", pd.NA)
 
-    cleaned_data = cleaned_data.dropna(
-        subset=required_columns
-    )
+    cleaned_data = cleaned_data.dropna(subset=required_columns)
 
     # Convert price columns to numbers.
     for column in ["discounted_price", "actual_price"]:
         if column in cleaned_data.columns:
-            cleaned_data[column] = clean_currency(
-                cleaned_data[column]
-            )
+            cleaned_data[column] = clean_currency(cleaned_data[column])
 
             cleaned_data.loc[
                 cleaned_data[column] < 0,
@@ -123,9 +101,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
             cleaned_data["discount_percentage"]
         )
 
-        invalid_discount = ~cleaned_data[
-            "discount_percentage"
-        ].between(0, 100)
+        invalid_discount = ~cleaned_data["discount_percentage"].between(0, 100)
 
         cleaned_data.loc[
             invalid_discount,
@@ -148,9 +124,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
 
     # Convert rating counts to integers.
     if "rating_count" in cleaned_data.columns:
-        cleaned_data["rating_count"] = clean_count(
-            cleaned_data["rating_count"]
-        )
+        cleaned_data["rating_count"] = clean_count(cleaned_data["rating_count"])
 
         cleaned_data.loc[
             cleaned_data["rating_count"] < 0,
@@ -186,10 +160,7 @@ def main() -> None:
 
     print(f"Rows before cleaning: {len(raw_data)}")
     print(f"Rows after cleaning:  {len(cleaned_data)}")
-    print(
-        "Removed rows:         "
-        f"{len(raw_data) - len(cleaned_data)}"
-    )
+    print(f"Removed rows:         {len(raw_data) - len(cleaned_data)}")
 
     numeric_columns = [
         "discounted_price",
@@ -200,9 +171,7 @@ def main() -> None:
     ]
 
     existing_columns = [
-        column
-        for column in numeric_columns
-        if column in cleaned_data.columns
+        column for column in numeric_columns if column in cleaned_data.columns
     ]
 
     print("\nNumeric column types:")

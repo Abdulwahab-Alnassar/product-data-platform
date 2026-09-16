@@ -9,11 +9,13 @@ from src.clean_data import (
 
 
 def test_clean_currency() -> None:
-    values = pd.Series([
-        "₹1,099",
-        " ₹399 ",
-        "invalid",
-    ])
+    values = pd.Series(
+        [
+            "₹1,099",
+            " ₹399 ",
+            "invalid",
+        ]
+    )
 
     result = clean_currency(values)
 
@@ -23,11 +25,13 @@ def test_clean_currency() -> None:
 
 
 def test_clean_percentage() -> None:
-    values = pd.Series([
-        "64%",
-        " 10% ",
-        "invalid",
-    ])
+    values = pd.Series(
+        [
+            "64%",
+            " 10% ",
+            "invalid",
+        ]
+    )
 
     result = clean_percentage(values)
 
@@ -37,11 +41,13 @@ def test_clean_percentage() -> None:
 
 
 def test_clean_count() -> None:
-    values = pd.Series([
-        "24,269",
-        " 1,000 ",
-        "invalid",
-    ])
+    values = pd.Series(
+        [
+            "24,269",
+            " 1,000 ",
+            "invalid",
+        ]
+    )
 
     result = clean_count(values)
 
@@ -88,12 +94,14 @@ def test_clean_data_pipeline() -> None:
         "user_name": "Missing ID",
     }
 
-    raw_data = pd.DataFrame([
-        valid_product,
-        valid_product.copy(),
-        invalid_product,
-        missing_product_id,
-    ])
+    raw_data = pd.DataFrame(
+        [
+            valid_product,
+            valid_product.copy(),
+            invalid_product,
+            missing_product_id,
+        ]
+    )
 
     cleaned_data = clean_data(raw_data)
 

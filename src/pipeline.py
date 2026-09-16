@@ -2,6 +2,8 @@
 
 import argparse
 import logging
+from datetime import datetime, timezone
+from uuid import uuid4
 from pathlib import Path
 from time import perf_counter
 from typing import Optional
@@ -9,6 +11,7 @@ from typing import Optional
 from src import clean_data as cleaning
 from src import load_to_db as database
 from src.logging_utils import pipeline_logging
+from src.reports import write_json
 from src.validate_data import build_quality_report, require_quality, save_quality_report
 
 LOGGER = logging.getLogger("product_data_platform")
@@ -18,18 +21,34 @@ LOG_PATH = cleaning.PROJECT_ROOT / "logs" / "pipeline.log"
 def run_pipeline(
     raw_data_path: Optional[Path] = None,
     output_dir: Optional[Path] = None,
-    backend: str = 'sqlite',
+    backend: str = "sqlite",
 ) -> dict[str, int]:
     """Validate before writing data; verify the batch separately from the total."""
     started = perf_counter()
-    if backend not in ('sqlite', 'postgres'):
-        raise ValueError('Unknown backend.')
+    if backend not in ("sqlite", "postgres"):
+        raise ValueError("Unknown backend.")
     source = cleaning.RAW_DATA_PATH if raw_data_path is None else Path(raw_data_path)
     output = None if output_dir is None else Path(output_dir)
-    cleaned_path = cleaning.PROCESSED_DATA_PATH if output is None else output / "cleaned_products.csv"
-    sample_path = cleaning.SAMPLE_DATA_PATH if output is None else output / "cleaned_products_sample.csv"
+    cleaned_path = (
+        cleaning.PROCESSED_DATA_PATH
+        if output is None
+        else output / "cleaned_products.csv"
+    )
+    sample_path = (
+        cleaning.SAMPLE_DATA_PATH
+        if output is None
+        else output / "cleaned_products_sample.csv"
+    )
     db_path = database.DATABASE_PATH if output is None else output / "products.db"
     report_path = cleaned_path.parent / "quality_report.json"
+    run_path = cleaned_path.parent / "run_report.json"
+    run = {
+        "run_id": uuid4().hex,
+        "status": "running",
+        "backend": backend,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    write_json(run_path, run)
 
     try:
         LOGGER.info("[1/5] Extract: reading %s", source)
@@ -46,9 +65,14 @@ def run_pipeline(
         LOGGER.info("[3/5] Validate: preparing unique products")
         prepared = database.prepare_data(cleaned)
         report = build_quality_report(prepared, source_columns=cleaned.columns)
+        report["run_id"] = run["run_id"]
         save_quality_report(report, report_path)
-        LOGGER.info("Quality report: %s (errors=%s, warnings=%s)",
-                    report_path, report["failed_checks"], report["warning_checks"])
+        LOGGER.info(
+            "Quality report: %s (errors=%s, warnings=%s)",
+            report_path,
+            report["failed_checks"],
+            report["warning_checks"],
+        )
         if report["warning_checks"]:
             LOGGER.warning("Missing numeric values: see quality report for counts")
         require_quality(report)
@@ -58,8 +82,9 @@ def run_pipeline(
             cleaned, processed_path=cleaned_path, sample_path=sample_path
         )
         LOGGER.info("[5/5] Load: upserting %s products", len(prepared))
-        if backend == 'postgres':
+        if backend == "postgres":
             from src import postgres_storage
+
             verified = postgres_storage.load_database(prepared)
         else:
             verified = database.load_database(prepared, database_path=db_path)
@@ -68,7 +93,11 @@ def run_pipeline(
                 f"Database row count mismatch: expected {len(prepared)}, found {verified}."
             )
 
-        total = postgres_storage.get_database_count() if backend == 'postgres' else database.get_database_count(db_path)
+        total = (
+            postgres_storage.get_database_count()
+            if backend == "postgres"
+            else database.get_database_count(db_path)
+        )
         summary = {
             "raw_rows": len(raw),
             "cleaned_rows": len(cleaned),
@@ -78,17 +107,40 @@ def run_pipeline(
             "database_rows": total,
         }
         LOGGER.info("Completed in %.3f seconds: %s", perf_counter() - started, summary)
+        write_json(
+            run_path,
+            {
+                **run,
+                "status": "completed",
+                "summary": summary,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "duration_seconds": perf_counter() - started,
+            },
+        )
         return summary
-    except Exception:
+    except Exception as error:
+        write_json(
+            run_path,
+            {
+                **run,
+                "status": "failed",
+                "error_type": type(error).__name__,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
         LOGGER.exception("Pipeline failed after %.3f seconds", perf_counter() - started)
         raise
 
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, help="Raw CSV (default: data/raw/amazon.csv)")
-    parser.add_argument("--output-dir", type=Path, help="Isolated output directory for demos")
-    parser.add_argument('--backend', choices=['sqlite', 'postgres'], default='sqlite')
+    parser.add_argument(
+        "--input", type=Path, help="Raw CSV (default: data/raw/amazon.csv)"
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, help="Isolated output directory for demos"
+    )
+    parser.add_argument("--backend", choices=["sqlite", "postgres"], default="sqlite")
     args = parser.parse_args(argv)
     log_path = LOG_PATH if args.output_dir is None else args.output_dir / "pipeline.log"
     with pipeline_logging(log_path) as logger:

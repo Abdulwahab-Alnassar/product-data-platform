@@ -8,3 +8,5 @@ logs
 __pycache__
 .pytest_cache
 *.backup
+artifacts
+.ruff_cache

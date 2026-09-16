@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  OMP_NUM_THREADS: '1'
+  OPENBLAS_NUM_THREADS: '1'
+
 jobs:
   test:
     strategy:
@@ -25,13 +29,21 @@ jobs:
           python-version: '3.12'
           cache: pip
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install -r requirements.lock
       - name: Run unit and integration tests
         run: python -m pytest -v
       - name: Run pipeline on the public sample
         run: python -m src.pipeline --input data/sample/amazon_sample.csv --output-dir data/processed/ci-demo
       - name: Run saved SQL analysis
         run: python -m src.analyze_data --database data/processed/ci-demo/products.db
+      - name: Train and evaluate the included demo
+        run: python -m src.demo --output-dir data/processed/demo
+      - name: Evaluate retrieval and monitor the catalog
+        env:
+          SQLITE_PATH: data/processed/demo/products.db
+        run: |
+          python -m src.evaluate_search
+          python -m src.monitor
 
   postgres:
     runs-on: ubuntu-latest
@@ -55,7 +67,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt
+      - run: python -m pip install -r requirements.lock
       - run: python -m pytest -v -m postgres
 
   docker:
@@ -68,11 +80,18 @@ jobs:
         with:
           persist-credentials: false
       - name: Build and start complete demo
-        run: docker compose up --build -d --wait dashboard
+        run: docker compose up --build -d --wait dashboard api
       - name: Verify dashboard and stored products
         run: |
           curl --fail http://localhost:8501/_stcore/health
           docker compose exec -T dashboard python -c "from src.query_data import load_analytics; data=load_analytics('postgres'); assert len(data)>0; print('Products:', len(data))"
+          docker compose exec -T api python -m src.smoke
+      - name: Verify a real backup can be restored
+        run: |
+          docker compose exec -T db pg_dump -U products_app -d products -Fc -f /tmp/products.backup
+          docker compose exec -T db createdb -U products_app restore_check
+          docker compose exec -T db pg_restore -U products_app -d restore_check --exit-on-error /tmp/products.backup
+          docker compose exec -T db psql -U products_app -d restore_check -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF (SELECT count(*) FROM products) <> 100 THEN RAISE EXCEPTION 'Restore count mismatch'; END IF; END \$\$;"
       - name: Container logs
         if: failure()
         run: docker compose logs

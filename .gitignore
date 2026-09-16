@@ -14,3 +14,6 @@ logs/
 .env.*
 !.env.example
 *.backup
+artifacts/
+.ruff_cache/
+*.sqlite

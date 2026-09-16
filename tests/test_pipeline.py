@@ -53,18 +53,20 @@ def raw_products() -> pd.DataFrame:
         "user_name": "Demo Customer",
     }
 
-    return pd.DataFrame([
-        product,
-        product.copy(),
-        {**product, "rating_count": "500"},
-        {
-            **product,
-            "product_id": "P2",
-            "product_name": "Mouse",
-            "rating": "|",
-            "rating_count": None,
-        },
-    ])
+    return pd.DataFrame(
+        [
+            product,
+            product.copy(),
+            {**product, "rating_count": "500"},
+            {
+                **product,
+                "product_id": "P2",
+                "product_name": "Mouse",
+                "rating": "|",
+                "rating_count": None,
+            },
+        ]
+    )
 
 
 @pytest.fixture

@@ -12,9 +12,7 @@ def load_data(file_path: Path) -> pd.DataFrame:
     """Load product data from a CSV file."""
 
     if not file_path.exists():
-        raise FileNotFoundError(
-            f"Dataset was not found at: {file_path}"
-        )
+        raise FileNotFoundError(f"Dataset was not found at: {file_path}")
 
     return pd.read_csv(file_path)
 
@@ -27,7 +25,7 @@ def inspect_data(data: pd.DataFrame) -> None:
     print(f"Number of columns: {data.shape[1]}")
     print(f"Duplicate rows: {data.duplicated().sum()}")
 
-    memory_mb = data.memory_usage(deep=True).sum() / (1024 ** 2)
+    memory_mb = data.memory_usage(deep=True).sum() / (1024**2)
     print(f"Memory usage: {memory_mb:.2f} MB")
 
     print("\n=== COLUMN NAMES ===")

@@ -2,219 +2,175 @@
 
 [![Tests](https://github.com/Abdulwahab-Alnassar/product-data-platform/actions/workflows/tests.yml/badge.svg)](https://github.com/Abdulwahab-Alnassar/product-data-platform/actions/workflows/tests.yml)
 
-A personal data engineering and AI project that cleans product data,
-validates quality, upserts products into SQLite, and runs SQL analytics.
+A local platform covering the path from a messy product CSV to validated storage,
+category prediction, search, cited answers, incremental updates, and operational checks.
 
-## Project Goal
+The demo runs on the included 100-product sample without API keys, paid services,
+or downloaded language models. It supports SQLite and PostgreSQL. Prices stay in INR.
 
-Build an end-to-end product data platform, starting with batch processing
-and gradually extending to real-time pipelines and AI-powered product Q&A.
-The month-one core includes PostgreSQL, Docker, and a local Streamlit dashboard.
-Hybrid search, real-time ingestion, and RAG remain future milestones.
+## Completed milestones
 
-## Current Progress
+| Stage | Working feature | Main files |
+| --- | --- | --- |
+| Month 1: data | Cleaning, quality gates, transactional upserts, SQL analytics, Docker | `src/pipeline.py`, `sql/` |
+| Month 2: ML | TF-IDF + logistic regression, baseline, train/validation/test splits, JSON artifact | `src/train_model.py`, `src/predict.py` |
+| Month 3: serving | FastAPI, validation, guarded writes, predictions and health | `src/api.py` |
+| Month 4: retrieval | Lexical + latent-vector search, exact IDs, cited facts, optional local RAG | `src/search.py`, `src/qa.py` |
+| Month 5: updates | Versioned events, retries, deletion tombstones, transactional change feed | `src/events.py`, `sql/changes.sql` |
+| Month 6: operations | Monitoring, metrics, backup/restore checks, CI and documentation | `src/monitor.py`, `src/backup.py`, `docs/` |
 
-- [x] PostgreSQL transactional storage and integration tests (week 3)
-- [x] Docker Compose: database, sample pipeline, local dashboard (week 3)
-- [x] Read-only Streamlit dashboard, filters, safe CSV export (week 4)
-- [x] Dashboard tests, container smoke checks, operational guide (week 4)
+Months 3–6 are the scope chosen to complete this repository, not a reconstruction
+of an unavailable earlier study plan. See the [completion map](docs/completion-map.md).
 
-Start with the [Arabic weeks 3–4 guide](docs/week3-4-guide-ar.md) for commands,
-file-by-file explanations, backup instructions, and known limitations.
+## Windows quick start
 
-- [x] Project structure and dataset exploration
-- [x] Data cleaning and relational storage
-- [x] Basic SQL analysis and automated testing
-- [x] Unified ETL pipeline (week 2, day 1)
-- [x] Logging and failure reporting (day 2)
-- [x] Data quality reports (day 3)
-- [x] Transactional SQLite upsert (day 4)
-- [x] SQL views and window functions (day 5)
-- [x] GitHub Actions workflow (day 6)
-- [x] Week 2 documentation and reading guide (day 7)
+Use Python 3.12 and PowerShell in the repository root. Keep your existing virtual
+environment if you already have one.
 
-Read the [Arabic week 2 guide](docs/week2-guide-ar.md) for a day-by-day
-explanation and the recommended order for reading the code.
-
-## Technology Stack
-
-Python 3.12, Pandas, SQLite, SQL, Pytest, Git, and GitHub Actions.
-PostgreSQL 17, Psycopg 3, Docker Compose, and Streamlit complete the core demo.
-
-## Dashboard quick start
-
-After installing dependencies and running the default SQLite pipeline:
-
-```bash
-python -m streamlit run dashboard.py
+```powershell
+git pull --ff-only origin main
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock
+.\.venv\Scripts\python.exe -m src.demo
+$env:SQLITE_PATH = 'data/processed/demo/products.db'
+.\.venv\Scripts\python.exe -m streamlit run dashboard.py
 ```
 
-Open http://localhost:8501. For a different SQLite output, set `SQLITE_PATH`
-to its `products.db`. The dashboard reads stored products, not the latest
-incoming batch only. Search is literal and CSV downloads escape formula-like
-text. This is a local educational demo without authentication.
+Open http://localhost:8501. The dashboard includes analytics, prediction, hybrid
+search, product Q&A, and data health. Stop it with Ctrl+C. Demo outputs are isolated
+from your original full dataset. On Linux/macOS, use `.venv/bin/python` and
+`export SQLITE_PATH=data/processed/demo/products.db` instead.
 
-For PostgreSQL and Docker, copy `.env.example` to `.env` if it does not already
-exist, set a strong `POSTGRES_PASSWORD`, and run:
+Start the API in a second terminal:
 
-```bash
-docker compose up --build -d --wait dashboard
+```powershell
+$env:SQLITE_PATH = 'data/processed/demo/products.db'
+.\.venv\Scripts\python.exe -m uvicorn src.api:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-This explicitly loads the included sample. PostgreSQL data persists in a
-named volume; `docker compose down` stops services without deleting it.
-The dashboard is bound to loopback only. Never commit `.env` or backups.
-See the Arabic guide for full local input, troubleshooting, and backups.
-The standalone pipeline selects PostgreSQL with `--backend postgres`;
-connection configuration is `DATABASE_URL` or `PGHOST`, `PGPORT`,
-`POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD` (environment wins over `.env`).
-SQLite remains the default. Both stores use the same incoming-batch quality gate.
-PostgreSQL schema and view SQL live in `sql/postgres/`; existing SQLite files
-are not automatically migrated. Saved CLI SQL analysis currently targets SQLite;
-the dashboard supports both databases.
+Open http://localhost:8000/docs. `/health` checks the process; `/ready` checks
+database initialization. Prediction requires a trained model.
 
-## Setup and Run
+## PostgreSQL and Docker
 
-From the repository root, activate your virtual environment and install:
+Start Docker Desktop with Linux containers. Copy `.env.example` to `.env`
+only if that file does not already exist, then set a strong nonempty
+`POSTGRES_PASSWORD`. Leave `PLATFORM_API_KEY` empty to disable HTTP writes.
 
-```bash
-python -m pip install -r requirements.txt
+```powershell
+docker compose up --build -d --wait dashboard api
+docker compose logs pipeline
+docker compose exec -T api python -m src.smoke
 ```
 
-Place the original Amazon Sales Dataset at `data/raw/amazon.csv`, then run:
+The database starts first, the initialization job loads the sample and trains
+the model, then the API and dashboard start. The job exiting with code 0 is normal.
+The published ports bind to 127.0.0.1; PostgreSQL has no host port. Named volumes
+preserve the database, models, and outputs. `docker compose down` keeps those
+volumes; adding `-v` deletes them. See the [operations guide](docs/operations.md).
 
-```bash
-python -m src.pipeline
-```
-
-The full dataset stays local and is not included in GitHub. A missing
-input file fails explicitly; the program never silently substitutes a sample.
-
-For a demonstration using the included public sample in a separate directory:
-
-```bash
-python -m src.pipeline --input data/sample/amazon_sample.csv --output-dir data/processed/demo
-python -m src.analyze_data --database data/processed/demo/products.db
-```
-
-## Pipeline Architecture
+## Architecture
 
 ```mermaid
 flowchart TD
-    A["Raw CSV"] --> B["Clean and prepare unique products"]
-    B --> C["Quality checks"]
-    C --> D["JSON quality report"]
-    C -->|Passed| E["Save CSVs and upsert SQLite"]
-    C -->|Failed| F["Stop before writing product data"]
-    E --> G["SQL views and analysis"]
+    CSV["Product CSV"] --> ETL["Clean and validate"]
+    ETL --> DB["SQLite or PostgreSQL"]
+    ETL --> ML["Train and evaluate classifier"]
+    Events["Versioned product events"] --> DB
+    DB --> Feed["Transactional change feed"]
+    DB --> Search["Catalog snapshot and search"]
+    Feed --> Search
+    Search --> API["API and dashboard"]
+    ML --> API
+    API --> QA["Cited answers"]
+    DB --> Monitor["Health and distribution checks"]
 ```
 
-Logging records stage starts, counts, total duration, and exceptions.
-The quality report describes the prepared incoming batch. It also checks
-that the cleaned intermediate columns contain no user ID/name columns.
+The classifier uses product names only. Duplicate IDs and identical titles are
+removed before splitting; rare categories are reported and excluded. The
+vectorizer learns from training data only. Validation selects between two
+regularization values, then the test set evaluates the selected artifact.
 
-## Outputs
+The demo has only two categories and a small test set. Its scores are not evidence
+of accuracy on a larger or different catalog. Unknown vocabulary causes abstention,
+and probabilities are not calibrated confidence. Read the [model card](docs/model-card.md).
 
-| Output | Default path |
-| --- | --- |
-| Cleaned intermediate rows | `data/processed/cleaned_products.csv` |
-| First 100 cleaned rows | `data/sample/cleaned_products_sample.csv` |
-| Product database | `data/processed/products.db` |
-| Latest quality report | `data/processed/quality_report.json` |
-| Rotating execution log | `logs/pipeline.log` |
+Search combines word/bigram TF-IDF similarity (70%) and SVD-derived latent-vector
+similarity (30%). Exact product codes take priority. These vectors come from the
+catalog, not a pretrained language model. The index refreshes on the next request
+after a committed revision change.
 
-With `--output-dir`, all five outputs go inside that directory. The default
-sample path is tracked by Git, so running the full pipeline may change that
-CSV. Raw data, processed outputs, and logs are ignored.
+Default Q&A returns catalog facts with product IDs and treats missing stock as
+unknown. Optional Ollama generation uses retrieved records as context and rejects
+unknown citations. Valid citations do not prove every generated statement is
+correct. See [retrieval and RAG](docs/retrieval.md).
 
-The cleaned CSV is an intermediate result and can contain multiple rows
-for the same product. Before loading, the pipeline keeps the row with
-the highest `rating_count` per ID; ties retain the first input row.
-The summary distinguishes cleaned rows, removed duplicate IDs,
-`batch_rows` (verified incoming products), and `database_rows` (all stored
-products). With partial batches, these last two numbers can differ.
+## Incremental updates
 
-## Quality Policy
-
-Blocking checks cover required columns, nonempty data, nonblank IDs/names,
-unique product IDs, finite/nonnegative numeric values, ratings in 0–5,
-discounts in 0–100, integer rating counts, price ordering, and absence of
-`user_id`/`user_name` columns.
-
-Missing numeric values are warnings, not invented zeros. Cleaning can
-convert malformed or out-of-range source values into missing values, so
-the report reflects the cleaned batch, not all original source defects.
-It includes counts rather than product/review contents.
-
-Missing input, an empty input, missing schema columns, or no usable products
-can fail before the quality stage, in which case consult the current log;
-a report left from an earlier run is not a report for the failed run.
-A failed quality check writes a diagnostic JSON report and stops before
-overwriting product CSVs or loading the database.
-
-## Upsert Semantics
-
-`product_id` is the key. A new ID is inserted; an existing ID is updated.
-Rows absent from an incoming batch remain stored. Incoming NULL values
-replace previous values too. Input order is authoritative; there is no
-timestamp-based conflict resolution yet.
-
-All product writes in a batch share a transaction. The loader checks
-every stored incoming value against a temporary batch table before commit.
-A failed insert or verification rolls back the batch's product changes.
-Schema/view initialization and CSV/report writes are separate operations,
-not a single transaction across files and SQLite. Concurrent runs against
-the same output directory are not supported.
-
-## SQL Analysis
-
-After a successful pipeline run, execute:
-
-```bash
-python -m src.analyze_data
+```powershell
+$env:SQLITE_PATH = 'data/processed/demo/products.db'
+.\.venv\Scripts\python.exe -m src.events examples/events.jsonl
 ```
 
-- `sql/analysis_queries.sql`: the original five queries.
-- `sql/views.sql`: `product_analytics` and `category_product_rankings`.
-- `sql/advanced_queries.sql`: rating groups, category ranks, average savings,
-  missing values, and inconsistent stored prices.
+This adds a labeled synthetic lantern, then changes its price and stock. Search
+for `DEMO-LANTERN` in the dashboard. Replaying the file is safe. Older versions
+are ignored; reused IDs with changed payloads are rejected. Deletion tombstones
+prevent older events from resurrecting products.
 
-Prices and savings remain in **Indian rupees (INR)**, the source currency.
-Ranks use the main category (the first part of the pipe-delimited taxonomy).
-`DENSE_RANK` preserves ties, so the top three ranks may contain more than
-three products. Unrated products have a NULL rank. Analysis opens the
-database read-only; run the updated pipeline once to create the views.
+Upsert events replace the supported product fields; omitted fields become NULL.
+Omitted inventory stays unchanged, while explicit null stock means unknown. The
+JSONL command commits each line separately. Fix a failed line and replay the file.
 
-The standalone `python src/clean_data.py` and
-`python src/load_to_db.py` commands remain available, but use the unified
-pipeline for logging and the full quality gate.
+Batch imports are authoritative for incoming IDs and do not obey event versions:
+load the baseline first, then use events for ongoing changes. Database triggers
+capture row changes in the same transaction. This is a trigger-based change feed,
+not Kafka/Debezium WAL streaming. Consumers poll `/changes?after=0` and persist the
+returned cursor. There is no upstream live Amazon feed or latency SLA.
 
-## Tests and Continuous Integration
+## Tests and reproducibility
 
-```bash
-python -m pytest -v
+```powershell
+.\.venv\Scripts\python.exe -m pytest -v
+.\.venv\Scripts\python.exe -m src.evaluate_search
+.\.venv\Scripts\python.exe -m src.monitor
 ```
 
-Tests use synthetic data and temporary databases. They cover cleaning,
-dashboard interactions, read-only access, PostgreSQL rollback and upserts,
-quality failures, pipeline orchestration, partial upserts, rollback,
-SQL rankings, and logging. GitHub Actions runs on pushes and pull requests
-on both Ubuntu and Windows using Python 3.12, then runs the public sample
-through the pipeline and saved SQL analysis. It does not use your full
-local dataset or upload raw data or generated databases.
+PostgreSQL tests skip locally unless `TEST_DATABASE_URL` identifies an explicit
+disposable database. CI runs them against PostgreSQL 17 in isolated schemas.
+Other jobs cover Windows, Linux, Docker, API smoke, and a real PostgreSQL restore.
+See [verification](docs/verification.md).
 
-PostgreSQL tests opt in with `TEST_DATABASE_URL` and isolate each test in a
-temporary schema. Use a disposable test database only. Separate CI jobs run
-these tests on PostgreSQL 17 and build/start the full Compose stack with a
-dashboard health check and a real analytics query.
+`requirements.lock` records the resolved Python 3.12 environment used by CI and
+Docker; `requirements.txt` contains development ranges. Generated databases,
+models, raw inputs, reports, logs, and secrets are ignored by Git.
+`evaluation/demo/` contains a small evaluation snapshot for review.
 
-## Dataset and Data Handling
+## Reading guide
 
-This project uses the public Amazon Sales Dataset available on Kaggle.
-Cleaning removes the `user_id` and `user_name` columns.
-Free-text reviews are not automatically anonymized.
+Read `src/pipeline.py`, `src/train_model.py`, `src/predict.py`, `src/catalog.py`,
+`src/events.py`, `src/search.py`, `src/qa.py`, and `src/api.py` in that order.
+Comments explain design decisions; the tests show normal behavior and failure cases.
+
+- [Arabic project guide](docs/project-guide-ar.md)
+- [Architecture and contracts](docs/architecture.md)
+- [Operations and troubleshooting](docs/operations.md)
+- [Security and privacy](SECURITY.md)
+- [Original week 2 guide](docs/week2-guide-ar.md)
+- [Original weeks 3–4 guide](docs/week3-4-guide-ar.md)
+
+## Data and boundaries
+
+Source: [Amazon Sales Dataset](https://www.kaggle.com/datasets/karkavelrajaj/amazon-sales-dataset).
+The public sample omits customer identifiers and blanks review fields. This does
+not rewrite old Git history. Search and API responses exclude reviews and mask
+obvious email addresses and phone numbers; this is not complete anonymization.
+
+This is a complete local portfolio application, not a publicly deployed production
+service. Reader authentication, per-user authorization, distributed indexing,
+managed secrets, retention policies, and automatic model approval are outside its
+current operating boundary. The in-memory catalog is capped at 50,000 products.
+Do not expose the local demo directly to the internet.
 
 ## Author
 
-Abdulwahab Alnassar  
-Computer Science Student at King Saud University
+Abdulwahab Alnassar — Computer Science, King Saud University

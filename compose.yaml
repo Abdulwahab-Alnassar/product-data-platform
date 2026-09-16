@@ -20,17 +20,21 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-products}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       DASHBOARD_BACKEND: postgres
+      PLATFORM_BACKEND: postgres
     depends_on:
       db:
         condition: service_healthy
-    command: [python, -m, src.pipeline, --backend, postgres, --input, data/sample/amazon_sample.csv, --output-dir, data/processed]
+    command: [python, -m, src.demo, --backend, postgres, --input, data/sample/amazon_sample.csv, --output-dir, data/processed, --model-dir, artifacts/category]
     volumes:
       - outputs:/app/data/processed
+      - models:/app/artifacts
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
   dashboard:
     build: .
     environment: *app-env
+    volumes:
+      - models:/app/artifacts:ro
     depends_on:
       pipeline:
         condition: service_completed_successfully
@@ -42,6 +46,26 @@ services:
       retries: 20
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+  api:
+    build: .
+    environment:
+      <<: *app-env
+      PLATFORM_API_KEY: ${PLATFORM_API_KEY:-}
+    command: [python, -m, uvicorn, src.api:app, --host, 0.0.0.0, --port, '8000', --no-access-log]
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    volumes:
+      - models:/app/artifacts:ro
+    ports: ['127.0.0.1:8000:8000']
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
 volumes:
   pgdata:
   outputs:
+  models:

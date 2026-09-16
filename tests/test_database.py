@@ -37,10 +37,12 @@ def make_product(
 
 
 def test_validate_columns_rejects_missing_columns() -> None:
-    incomplete_data = pd.DataFrame({
-        "product_id": ["P1"],
-        "product_name": ["Product P1"],
-    })
+    incomplete_data = pd.DataFrame(
+        {
+            "product_id": ["P1"],
+            "product_name": ["Product P1"],
+        }
+    )
 
     with pytest.raises(
         ValueError,
@@ -50,10 +52,12 @@ def test_validate_columns_rejects_missing_columns() -> None:
 
 
 def test_prepare_data_keeps_best_duplicate() -> None:
-    data = pd.DataFrame([
-        make_product("P1", rating_count=100),
-        make_product("P1", rating_count=500),
-    ])
+    data = pd.DataFrame(
+        [
+            make_product("P1", rating_count=100),
+            make_product("P1", rating_count=500),
+        ]
+    )
 
     prepared_data = prepare_data(data)
 
@@ -75,22 +79,22 @@ def test_load_database_creates_products_table(
         temporary_database,
     )
 
-    data = pd.DataFrame([
-        make_product("P1"),
-        make_product("P2"),
-    ])
+    data = pd.DataFrame(
+        [
+            make_product("P1"),
+            make_product("P2"),
+        ]
+    )
 
     inserted_count = load_to_db.load_database(data)
 
     assert inserted_count == 2
     assert temporary_database.exists()
 
-    with sqlite3.connect(
-        temporary_database
-    ) as connection:
-        database_count = connection.execute(
-            "SELECT COUNT(*) FROM products"
-        ).fetchone()[0]
+    with sqlite3.connect(temporary_database) as connection:
+        database_count = connection.execute("SELECT COUNT(*) FROM products").fetchone()[
+            0
+        ]
 
         product_ids = connection.execute(
             """

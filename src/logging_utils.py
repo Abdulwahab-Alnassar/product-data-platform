@@ -19,9 +19,7 @@ def pipeline_logging(log_path: Path):
         log_path, maxBytes=1_000_000, backupCount=3, encoding="utf-8"
     )
     console_handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
     handlers = (file_handler, console_handler)
     for handler in handlers:
         handler.setFormatter(formatter)

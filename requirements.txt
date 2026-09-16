@@ -1,6 +1,10 @@
-pandas
-sqlalchemy
-pytest
-python-dotenv
+pandas>=2.2,<3
+sqlalchemy>=2,<3
+pytest>=8,<10
+python-dotenv>=1,<2
 psycopg[binary]>=3.2,<4
 streamlit>=1.40,<2
+scikit-learn>=1.5,<2
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+httpx>=0.27,<1

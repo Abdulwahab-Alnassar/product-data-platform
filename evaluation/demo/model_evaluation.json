@@ -1,0 +1,190 @@
+{
+  "model_id": "84dd4f1b5e5f6fe1",
+  "data_sha256": "0c3aa457576eff15289ccde5740008db2a9e926af44db7a62edfe5d51a3f0daa",
+  "seed": 42,
+  "python": "3.12.14",
+  "sklearn": "1.9.1",
+  "rows": 100,
+  "excluded_rare_categories": {},
+  "split_sizes": {
+    "train": 62,
+    "validation": 19,
+    "test": 19
+  },
+  "split_product_ids": {
+    "train": [
+      "B09NKZXMWJ",
+      "B09CMM3VGK",
+      "B008FWZGSG",
+      "B09RWZRCP1",
+      "B08CF3B7N1",
+      "B082T6V3DT",
+      "B08HDH26JX",
+      "B082LSVT4B",
+      "B08WRWPM22",
+      "B07JH1C41D",
+      "B01GGKZ0V6",
+      "B08CHKQ8D4",
+      "B09CMP1SC8",
+      "B07JW1Y6XV",
+      "B09W5XR9RT",
+      "B008IFXQFU",
+      "B08HDJ86NZ",
+      "B08CF3D7QR",
+      "B0711PVX6Z",
+      "B09Q8HMKZX",
+      "B0BFWGBX61",
+      "B00V4BGDKU",
+      "B08WRBG3XW",
+      "B09RZS1NQT",
+      "B07232M876",
+      "B09KLVMZ3B",
+      "B08Y1TFSP6",
+      "B098NS6PVG",
+      "B07XLCFSSN",
+      "B07LGT55SJ",
+      "B08LKS3LSP",
+      "B002PD61Y4",
+      "B0994GFWBH",
+      "B09C6HXFC1",
+      "B0974H97TJ",
+      "B077Z65HSD",
+      "B09NHVCHS9",
+      "B094JNXNPV",
+      "B07GVGTSLN",
+      "B0789LZTCJ",
+      "B08QSC1XY8",
+      "B0B5ZF3NRK",
+      "B01GGKYKQM",
+      "B0B1YZX72F",
+      "B09F9YQQ7B",
+      "B09JPC82QC",
+      "B0B6F7LX4C",
+      "B093ZNQZ2Y",
+      "B014I8SX4Y",
+      "B0B1YVCJ2Y",
+      "B01N90RZ4M",
+      "B07MKFNHKG",
+      "B07B275VN9",
+      "B09ZPM4C2C",
+      "B09L8DSSFH",
+      "B014I8SSD0",
+      "B09VCHLSJF",
+      "B09T3KB6JZ",
+      "B0B9XN9S3W",
+      "B0BCZCQTJX",
+      "B08DPLCM6T",
+      "B09RFC46VP"
+    ],
+    "validation": [
+      "B0BMXMLSMM",
+      "B09VT6JKRP",
+      "B096MSW6CT",
+      "B093QCY6YJ",
+      "B00NH11PEY",
+      "B0088TKTY2",
+      "B07XJYYH7L",
+      "B0B86CDHL1",
+      "B08CDKQ8T6",
+      "B09C6HWG18",
+      "B085DTN6R2",
+      "B0B4HJNPV4",
+      "B07P681N66",
+      "B092BJMT8Q",
+      "B07KSMBL2H",
+      "B085194JFL",
+      "B07966M8XH",
+      "B08B42LWKN",
+      "B09F6S8BT6"
+    ],
+    "test": [
+      "B0B4DT8MKT",
+      "B082LZGK39",
+      "B08DDRGWTJ",
+      "B09NJN8L25",
+      "B00NH11KIK",
+      "B0B2DJDCPX",
+      "B08Y1SJVV5",
+      "B083342NKJ",
+      "B07KRCW6LZ",
+      "B0141EZMAI",
+      "B09YLXYP7Y",
+      "B07JW9H4J1",
+      "B08R69VDHT",
+      "B0B15CPR37",
+      "B09Q5P2MT3",
+      "B08QX1CC14",
+      "B01M4GGIVU",
+      "B09Q5SWVBJ",
+      "B0B3MMYHYW"
+    ]
+  },
+  "validation_candidates": [
+    {
+      "C": 0.5,
+      "accuracy": 0.8947368421052632,
+      "macro_f1": 0.8642857142857143
+    },
+    {
+      "C": 2.0,
+      "accuracy": 0.9473684210526315,
+      "macro_f1": 0.936026936026936
+    }
+  ],
+  "chosen_C": 2.0,
+  "test": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0
+  },
+  "baseline_test": {
+    "accuracy": 0.6842105263157895,
+    "macro_f1": 0.40625
+  },
+  "classification_report": {
+    "Computers&Accessories": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 13.0
+    },
+    "Electronics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 6.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 19.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 19.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      13,
+      0
+    ],
+    [
+      0,
+      6
+    ]
+  ],
+  "class_order": [
+    "Computers&Accessories",
+    "Electronics"
+  ],
+  "test_errors": [],
+  "limitations": [
+    "Small catalog snapshot; not an estimate of real-world accuracy.",
+    "Identical titles are deduplicated; similar product families may still cross splits.",
+    "Only the product name is used; probabilities are not calibrated confidence."
+  ]
+}

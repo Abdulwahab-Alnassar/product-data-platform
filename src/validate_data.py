@@ -11,8 +11,11 @@ import pandas as pd
 from src.load_to_db import DATABASE_COLUMNS
 
 NUMERIC_COLUMNS = (
-    "discounted_price", "actual_price", "discount_percentage",
-    "rating", "rating_count",
+    "discounted_price",
+    "actual_price",
+    "discount_percentage",
+    "rating",
+    "rating_count",
 )
 
 
@@ -23,12 +26,14 @@ def build_quality_report(
     checks = []
 
     def check(name: str, invalid_count: int, severity: str = "error"):
-        checks.append({
-            "name": name,
-            "severity": severity,
-            "invalid_count": int(invalid_count),
-            "passed": int(invalid_count) == 0,
-        })
+        checks.append(
+            {
+                "name": name,
+                "severity": severity,
+                "invalid_count": int(invalid_count),
+                "passed": int(invalid_count) == 0,
+            }
+        )
 
     missing = set(DATABASE_COLUMNS) - set(data.columns)
     check("required_columns", len(missing))
@@ -72,10 +77,10 @@ def build_quality_report(
         invalid = actual.notna() & discounted.notna() & discounted.gt(actual)
         check("discounted_price_not_above_actual", invalid.fillna(False).sum())
 
-    errors = sum(not item["passed"] and item["severity"] == "error"
-                 for item in checks)
-    warnings = sum(not item["passed"] and item["severity"] == "warning"
-                   for item in checks)
+    errors = sum(not item["passed"] and item["severity"] == "error" for item in checks)
+    warnings = sum(
+        not item["passed"] and item["severity"] == "warning" for item in checks
+    )
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "rows_checked": len(data),
@@ -98,7 +103,8 @@ def save_quality_report(report: dict, path: Path) -> None:
 def require_quality(report: dict) -> None:
     if report["status"] != "passed":
         failed = [
-            item["name"] for item in report["checks"]
+            item["name"]
+            for item in report["checks"]
             if not item["passed"] and item["severity"] == "error"
         ]
         raise ValueError("Data quality failed: " + ", ".join(failed))
